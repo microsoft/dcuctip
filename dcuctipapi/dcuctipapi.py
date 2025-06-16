@@ -67,7 +67,7 @@ def ConfigureLogging():
                                  ]
                        )
 
-def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo: int) -> int:
+def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo: int, only_return_data: bool = False):
     """
     Connect to the CTIP API (Infected or C2) to download data for the desired timeframe (hoursAgo)
 
@@ -76,10 +76,13 @@ def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo:
         subscriptionName (str): a descriptive string used to name output files
         subscriptionKey (str): the subscription key provided by DCU to grant CTIP API access
         hoursAgo (int): the timeframe to retrieve data from the CTIP API; valid values are 1..72
+        only_return_data (bool): if True, returns all data as a list and does not save files
 
     Returns:
-        int: the total number of CTIP data items downloaded from the API
+        int or list: the total number of CTIP data items downloaded from the API, or the list of items if only_return_data is True
     """
+
+    all_data = []  # For response in only_return_data is True
 
     try:
         # Set a datetime for file naming
@@ -156,7 +159,11 @@ def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo:
 
                 # Determine number of data rows from the downloaded content
                 log.info(f'{BASE_SPACE} Determine the number of data rows downloaded')
-                downloadedDataCount = GetDownloadedDataCount(apiResponse.content)
+                # Aquí descomprimimos y parseamos el JSON para devolverlo si only_return_data
+                with gzip.GzipFile(fileobj=BytesIO(apiResponse.content)) as gzFile:
+                    jsonBytes = gzFile.read()
+                ctipData = json.loads(jsonBytes.decode('utf-8'))
+                downloadedDataCount = len(ctipData)
                 totalDownloadedDataCount += downloadedDataCount # Add downloaded count to total downloaded counter
 
                 # Check for data to process
@@ -166,41 +173,48 @@ def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo:
                     #
                     log.info(f"{BASE_SPACE} Downloaded [dc:{downloadedDataCount:07d} // tc:{totalDownloadedDataCount:07d}] rows of CTIP {ctipApi.title()} data")
 
-                    # Save the GZip compressed json payload to a local file
-                    gzFileCount += 1
-                    gzFilename = os.path.join(CTIP_DATA_DIRECTORY, f'{subscriptionName}_CTIP_{ctipApi.title()}_{ctipDataFileDateTime}_{gzFileCount:03d}.json.gz')
-                    log.info(f"{BASE_SPACE} Target destination file: {gzFilename}")
-                    WriteDataToFile(gzFilename, apiResponse.content)
+                    if not only_return_data:
+                        # Save the GZip compressed json payload to a local file
+                        gzFileCount += 1
+                        gzFilename = os.path.join(CTIP_DATA_DIRECTORY, f'{subscriptionName}_CTIP_{ctipApi.title()}_{ctipDataFileDateTime}_{gzFileCount:03d}.json.gz')
+                        log.info(f"{BASE_SPACE} Target destination file: {gzFilename}")
+                        WriteDataToFile(gzFilename, apiResponse.content)
 
-                    # Determine number of data rows saved
-                    log.info(f'{BASE_SPACE} Determine the number of data rows saved to file')
-                    savedDataCount = GetSavedDataCount(gzFilename)
-                    # sc = saved count for this iteration
-                    # tc = total saved count for this API session
-                    log.critical(f"{BASE_SPACE} Saved [sc:{savedDataCount:07d} // tc:{totalDownloadedDataCount:07d}] rows of CTIP {ctipApi.title()} data to: {os.path.basename(gzFilename)}")
+                        # Determine number of data rows saved
+                        log.info(f'{BASE_SPACE} Determine the number of data rows saved to file')
+                        savedDataCount = GetSavedDataCount(gzFilename)
+                        # sc = saved count for this iteration
+                        # tc = total saved count for this API session
+                        log.critical(f"{BASE_SPACE} Saved [sc:{savedDataCount:07d} // tc:{totalDownloadedDataCount:07d}] rows of CTIP {ctipApi.title()} data to: {os.path.basename(gzFilename)}")
 
-                    # *******************************************************************************************
-                    # *******************************************************************************************
-                    # 
-                    # Ingest CTIP data into your environment 
-                    # 
-                    # *******************************************************************************************
-                    # *******************************************************************************************
-                    UncompressAndProcessCtipData(data=apiResponse.content, ctipDataset=ctipApi)
+                        # *******************************************************************************************
+                        # *******************************************************************************************
+                        # 
+                        # Ingest CTIP data into your environment 
+                        # 
+                        # *******************************************************************************************
+                        # *******************************************************************************************
+                        UncompressAndProcessCtipData(data=apiResponse.content, ctipDataset=ctipApi)
 
-                    #
-                    # Increment for the next iteration
-                    #
-                    offset += savedDataCount
-                    log.debug(f'        downloadedDataCount: {downloadedDataCount}')
-                    log.debug(f'             savedDataCount: {savedDataCount}')
-                    log.debug(f'   totalDownloadedDataCount: {totalDownloadedDataCount}')
+                        #
+                        # Increment for the next iteration
+                        #
+                        offset += savedDataCount
+                        log.debug(f'        downloadedDataCount: {downloadedDataCount}')
+                        log.debug(f'             savedDataCount: {savedDataCount}')
+                        log.debug(f'   totalDownloadedDataCount: {totalDownloadedDataCount}')
 
-                    # Check for overall data download completion
-                    if (offset > totalRowCount):
-                        # Download completed
-                        log.debug(f"{BASE_SPACE} ----->> offset: {offset:07d} // totalRowCount: {totalRowCount:07d} ::> API download completed.  Exit processing. <<-----")
-                        break                    
+                        # Check for overall data download completion
+                        if (offset > totalRowCount):
+                            # Download completed
+                            log.debug(f"{BASE_SPACE} ----->> offset: {offset:07d} // totalRowCount: {totalRowCount:07d} ::> API download completed.  Exit processing. <<-----")
+                            break                    
+                    else:
+                        # Si only_return_data, we collect the data and increment the offset
+                        all_data.extend(ctipData)
+                        offset += downloadedDataCount
+                        if (offset > totalRowCount):
+                            break
                 else:
                     # Processing has completed
                     log.critical(f'{BASE_SPACE} Completed CTIP {ctipApi.title()} API processing')
@@ -243,8 +257,11 @@ def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo:
     finally:
         # Report total files created/downloaded from the API
         log.critical(f'{BASE_SPACE} Total CTIP {ctipApi.title()} files downloaded: {gzFileCount}')
-        # Return total downloaded row count to CtipApi() caller
-        return totalDownloadedDataCount
+        # Return all_data if only_return_data, else classic count
+        if only_return_data:
+            return all_data
+        else:
+            return totalDownloadedDataCount
 
 def WriteDataToFile(destFile: str, data: bytes):
     """
@@ -427,15 +444,16 @@ def main():
 
     # Configure and Process command line arguments
     parser = argparse.ArgumentParser(description='dcuctipapi - DCU CTIP API Download Utility\
-	\n\nConnects to the CTIP API to download and processes DCU CTIP data for the CTIP Infected and CTIP C2 datasets.'
-		, prog='dcuctipapi.py'
-		, formatter_class=RawTextHelpFormatter)
+    \n\nConnects to the CTIP API to download and processes DCU CTIP data for the CTIP Infected and CTIP C2 datasets.'
+        , prog='dcuctipapi.py'
+        , formatter_class=RawTextHelpFormatter)
 
     parser.add_argument('subscription_key', help=f'The CTIP API access key issued by DCU')
     parser.add_argument('--subscription_name', '-sn', default='dcuctipapi', help='Used to name the downloaded data file(s)\nDefault setting is "dcuctipapi"')
     parser.add_argument('--hoursago', '-ha', type=int, default=1, help='The timespan in hours to query historical CTIP API data\nRange of acceptable values is 1..72\nDefault setting is 1 hour')
     parser.add_argument('--verbose',  '-v', action='store_true', help='Flag to display verbose output \nVerbose output is disabled by default')
     parser.add_argument('--debug',  '-d', action='store_true', help='Flag to display debug output \nDebug output is disabled by default')
+    parser.add_argument('--only-return-data', action='store_true', help='Solo devuelve los datos descargados en vez de grabar archivos')
     args = parser.parse_args()
 
     # Set the Subscription Key API token 
@@ -455,6 +473,10 @@ def main():
     if args.debug:
         log.setLevel(logging.DEBUG)
 
+    onlyReturnData = args.only_return_data
+
+    if onlyReturnData:
+        log.critical('Only returning data, no files will be saved.')
     try:
         # Confirm local directories exist, create if necessary
         if not os.path.exists(BASE_DIRECTORY):
@@ -493,25 +515,39 @@ def main():
         #
         log.critical('')
         log.critical(f'Download CTIP Infected dataset...')
-        totalInfectedDataItems = CtipApi(ctipApi=CTIP_API_INFECTED, 
-                                         subscriptionName=subscriptionName, 
-                                         subscriptionKey=apiToken, 
-                                         hoursAgo=hoursAgo)
+        infected_result = CtipApi(
+            ctipApi=CTIP_API_INFECTED, 
+            subscriptionName=subscriptionName, 
+            subscriptionKey=apiToken, 
+            hoursAgo=hoursAgo,
+            only_return_data=onlyReturnData
+        )
 
         #
         # Call the CTIP C2 API
         #
         log.critical('')
         log.critical(f'Download CTIP C2 dataset...')
-        totalC2DataItems = CtipApi(ctipApi=CTIP_API_C2, 
-                                   subscriptionName=subscriptionName, 
-                                   subscriptionKey=apiToken, 
-                                   hoursAgo=hoursAgo)
+        c2_result = CtipApi(
+            ctipApi=CTIP_API_C2, 
+            subscriptionName=subscriptionName, 
+            subscriptionKey=apiToken, 
+            hoursAgo=hoursAgo,
+            only_return_data=onlyReturnData
+        )
 
+        if args.only_return_data:
+            print(json.dumps({
+                "infected": infected_result,
+                "c2": c2_result
+            }, ensure_ascii=False, indent=2))
+            log.critical(f'Total CTIP Infected Dataset Items: {len(infected_result)}')
+            log.critical(f'Total CTIP C2 Dataset Items:       {len(c2_result)}')
+        else:
+            log.critical(f'Total CTIP Infected Dataset Items: {infected_result}')
+            log.critical(f'Total CTIP C2 Dataset Items:       {c2_result}')
         log.critical('')
-        log.critical(f'Total CTIP Infected Dataset Items: {(totalInfectedDataItems)}')
-        log.critical(f'Total CTIP C2 Dataset Items:       {(totalC2DataItems)}')
-        log.critical('')
+
     except KeyboardInterrupt:
         log.error('')
         log.error('#############################################')
