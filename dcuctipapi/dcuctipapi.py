@@ -82,7 +82,7 @@ def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo:
         int or list: the total number of CTIP data items downloaded from the API, or the list of items if only_return_data is True
     """
 
-    all_data = []  # Para acumular todos los datos si only_return_data está activo
+    all_data = []  # For response in only_return_data is True
 
     try:
         # Set a datetime for file naming
@@ -210,7 +210,7 @@ def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo:
                             log.debug(f"{BASE_SPACE} ----->> offset: {offset:07d} // totalRowCount: {totalRowCount:07d} ::> API download completed.  Exit processing. <<-----")
                             break                    
                     else:
-                        # Si only_return_data, solo acumulamos los datos y avanzamos el offset
+                        # Si only_return_data, we collect the data and increment the offset
                         all_data.extend(ctipData)
                         offset += downloadedDataCount
                         if (offset > totalRowCount):
@@ -257,7 +257,7 @@ def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo:
     finally:
         # Report total files created/downloaded from the API
         log.critical(f'{BASE_SPACE} Total CTIP {ctipApi.title()} files downloaded: {gzFileCount}')
-        # Return all_data si only_return_data, si no el conteo clásico
+        # Return all_data if only_return_data, else classic count
         if only_return_data:
             return all_data
         else:
@@ -473,6 +473,10 @@ def main():
     if args.debug:
         log.setLevel(logging.DEBUG)
 
+    onlyReturnData = args.only_return_data
+
+    if onlyReturnData:
+        log.critical('Only returning data, no files will be saved.')
     try:
         # Confirm local directories exist, create if necessary
         if not os.path.exists(BASE_DIRECTORY):
@@ -516,7 +520,7 @@ def main():
             subscriptionName=subscriptionName, 
             subscriptionKey=apiToken, 
             hoursAgo=hoursAgo,
-            only_return_data=args.only_return_data
+            only_return_data=onlyReturnData
         )
 
         #
@@ -529,7 +533,7 @@ def main():
             subscriptionName=subscriptionName, 
             subscriptionKey=apiToken, 
             hoursAgo=hoursAgo,
-            only_return_data=args.only_return_data
+            only_return_data=onlyReturnData
         )
 
         if args.only_return_data:
