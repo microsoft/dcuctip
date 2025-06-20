@@ -903,8 +903,8 @@ def main():
     log.critical('')
 
     # Configure and Process command line arguments
-    parser = argparse.ArgumentParser(description='dcuctipapi2stix - DCU CTIP API Download Utility\
-	\n\nConnects to the CTIP API to download and processes DCU CTIP data for the CTIP Infected and CTIP C2 datasets.'
+    parser = argparse.ArgumentParser(description='dcuctipapi2stix - DCU CTIP API Download and STIX Translation Utility\
+	\n\nConnects to the CTIP API to download DCU CTIP data for the CTIP Infected and CTIP C2 datasets, and convert the CTIP data to STIX bundles.'
 		, prog='dcuctipapi2stix.py'
 		, formatter_class=RawTextHelpFormatter)
 
