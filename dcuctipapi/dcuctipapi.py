@@ -30,7 +30,7 @@ from http import HTTPStatus
 import requests  # requires installation: pip install requests
 
 # Program Version 
-BUILD_VERSION = '2025.06.10'
+BUILD_VERSION = '2025.06.20'
 
 # CTIP API settings
 CTIP_API_BASE_URL                = 'https://api.dcuctip.com/ctip'
