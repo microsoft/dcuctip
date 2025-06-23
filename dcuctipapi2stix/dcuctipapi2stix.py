@@ -32,7 +32,7 @@ from http import HTTPStatus
 import requests             # requires installation: pip install requests
 
 # Program Version 
-BUILD_VERSION = '2025.06.20'
+BUILD_VERSION = '2025.06.23'
 
 # CTIP API settings
 CTIP_API_BASE_URL                = 'https://api.dcuctip.com/ctip'
@@ -140,7 +140,7 @@ def CtipApi(config: Config) -> int:
             # Send the API request
             log.debug(f'   Sending CTIP API Request: {apiUrl}')
             # Display status to console only
-            print(f'Downloading data from the CTIP {config.CtipApi.title()} API', end="\r", flush=True)
+            SetStatusMessage(f'Downloading data from the CTIP {config.CtipApi.title()} API')
             apiResponse = requests.get(url=apiUrl, headers=apiHeaders)
 
             # Output response details
@@ -293,7 +293,7 @@ def SaveStixData(stixOutputFile: str, stixData: list):
     """
     log.info(f'Saving STIX data to: {stixOutputFile}')
     # Display status to console only
-    print(f'Saving STIX data to: {stixOutputFile}', end="\r", flush=True)
+    SetStatusMessage(f'Saving STIX data to: {stixOutputFile}')
 
     stixBundles = [json.loads(stixBundle.serialize()) for stixBundle in stixData]
     with open(stixOutputFile, 'w', encoding='utf-8') as file:
@@ -369,7 +369,7 @@ def UncompressAndProcessCtipData(data: bytes, config: Config, stixFileCount: int
             itemCount += 1
 
             # Display a realtime progress counter to console only
-            print(f'Converting CTIP Infected data to STIX objects: {itemCount} / {downloadedCtipItems}', end="\r", flush=True)
+            SetStatusMessage(f'Converting CTIP Infected data to STIX objects: {itemCount} / {downloadedCtipItems}')
 
             try:
                 # Generate STIX bundle from CTIP Infected data 
@@ -415,7 +415,7 @@ def UncompressAndProcessCtipData(data: bytes, config: Config, stixFileCount: int
             itemCount += 1
 
             # Display a realtime progress counter to console only
-            print(f'Converting CTIP C2 data to STIX objects: {itemCount}', end="\r", flush=True)
+            SetStatusMessage(f'Converting CTIP C2 data to STIX objects: {itemCount}')
 
             try:
                 # Generate STIX bundle from CTIP Infected data 
@@ -848,6 +848,16 @@ def ConvertCtipC2ToStix(objCtipData: dict) -> stix2.v21.bundle.Bundle:
         # Create and return a bundled set of STIX objects for the converted CTIP data object (no filehash object)
         return stix2.Bundle(infra, mw, nt, dstIP, asn, loc, custom1, custom2, custom3, custom4, custom5)
 
+def SetStatusMessage(message: str):
+    """
+    Sets/updates a status message displayed on the console/terminal to the provided message
+
+    Args:
+        message (str): the message to display 
+    """
+
+    print(f'{message}', end="\r", flush=True)
+    
 def GetCommandLine() -> str:
     """
     Builds the commandline that was used to launch dcuctipapi2stix.py
