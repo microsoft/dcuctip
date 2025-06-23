@@ -30,7 +30,7 @@ from http import HTTPStatus
 import requests  # requires installation: pip install requests
 
 # Program Version 
-BUILD_VERSION = '2025.06.20'
+BUILD_VERSION = '2025.06.23'
 
 # CTIP API settings
 CTIP_API_BASE_URL                = 'https://api.dcuctip.com/ctip'
@@ -121,7 +121,7 @@ def CtipApi(ctipApi: str, subscriptionName: str, subscriptionKey: str, hoursAgo:
             # Send the API request
             log.debug(f'   Sending CTIP API Request: {apiUrl}')
             # Display status to console only
-            print(f'Downloading data from the CTIP {ctipApi.title()} API', end="\r", flush=True)
+            SetStatusMessage(f'Downloading data from the CTIP {ctipApi.title()} API')
             apiResponse = requests.get(url=apiUrl, headers=apiHeaders)
 
             # Output response details
@@ -327,7 +327,7 @@ def UncompressAndProcessCtipData(data: bytes, ctipDataset: str) -> int:
             itemCount += 1
 
             # Display a realtime progress counter to console only
-            print(f'Processing CTIP Infected data object: {itemCount} / {downloadedCtipItems}', end="\r", flush=True)
+            SetStatusMessage(f'Processing CTIP Infected data object: {itemCount} / {downloadedCtipItems}')
 
             # *******************************************************************************************
             # *******************************************************************************************
@@ -348,7 +348,7 @@ def UncompressAndProcessCtipData(data: bytes, ctipDataset: str) -> int:
             itemCount += 1
 
             # Display a realtime progress counter to console only
-            print(f'Processing CTIP C2 data object: {itemCount} / {downloadedCtipItems}', end="\r", flush=True)
+            SetStatusMessage(f'Processing CTIP C2 data object: {itemCount} / {downloadedCtipItems}')
 
             # *******************************************************************************************
             # *******************************************************************************************
@@ -382,6 +382,16 @@ def SaveErrorResponseHtml(htmlData: str, eventName: str):
     with open(destinationFilename, 'w') as file:
         file.write(htmlData)
 
+def SetStatusMessage(message: str):
+    """
+    Sets/updates a status message displayed on the console/terminal to the provided message
+
+    Args:
+        message (str): the message to display 
+    """
+
+    print(f'{message}', end="\r", flush=True)
+    
 def FormatDateTimeYMDHMS(timestamp: datetime) -> str:
     """
     Formats a timestamp as string in the form YYYY-MM-DD HH:MM:SS
